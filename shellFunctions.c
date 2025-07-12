@@ -97,6 +97,21 @@ int dash_execute(char **args){
     return 1;
 }
 
+void add_to_history(char *comand){
+    if(history_count < HISTORY_SIZE){
+        history[history_count++] = strdup(comand);
+    }else{
+        free(history[0]);
+        for (size_t i = 1; i < HISTORY_SIZE; i++)
+        {
+            history[i - 1] = history[i];
+        }
+        history[HISTORY_SIZE - 1] = strdup(comand);
+        
+    }
+}
+
+
 
 void loop(){
     char *line;
