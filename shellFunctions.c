@@ -106,11 +106,66 @@ void add_to_history(char *comand){
         {
             history[i - 1] = history[i];
         }
-        history[HISTORY_SIZE - 1] = strdup(comand);
+        history[history_count++] = strdup(comand);
         
     }
 }
 
+void parse_comands(char *line, char **args){
+    int i = 0;
+    char *token = strtok(line,TOK_DELIM);
+    while(token != NULL){
+        args[i++] = token;
+        token = strtok(NULL,TOK_DELIM);
+    }
+    args[i] = NULL;
+}
+
+void handle_pipe(char *line){
+    int pipefd[2];
+    pid_t pid1, pid2;
+
+    char *left_cmd = strtok(line, "|");
+    char *right_cmd = strtok(NULL,"|");
+
+    if(left_cmd == NULL || right_cmd == NULL){
+        fprintf(stderr,"Invalid pipe syntax\n");
+        return;
+    }
+
+    char *args1[64];
+    char *args2[64];
+
+    parse_comands(left_cmd,args1);
+    parse_comands(right_cmd,args2);
+
+    pipe(pipefd);
+
+    pid1 = fork();
+    if(pid1 == 0){
+        dup2(pipefd[1],STDOUT_FILENO);
+        close(pipefd[0]);
+        close(pipefd[1]);
+        execvp(args1[0],args1);
+        perror("execvp left");
+        exit(1);
+    }
+
+    pid2 = fork();
+    if(pid2 == 0){
+        dup2(pipefd[0],STDIN_FILENO);
+        close(pipefd[1]);
+        close(pipefd[0]);
+        execvp(args2[0],args2);
+        perror("execvp rigth");
+        exit(1);
+    }
+
+    close(pipefd[0]);
+    close(pipefd[1]);
+    waitpid(pid1,NULL,0);
+    waitpid(pid2,NULL,0);
+}
 
 
 void loop(){
@@ -121,6 +176,12 @@ void loop(){
     do{
         printf(">");
         line = read_line();
+        if(strchr(line,'|') != NULL){
+            handle_pipe(line);
+            free(line);
+            free(args);
+            continue;
+        }
         args = split_lines(line);
         status = dash_execute(args);
         free(line);

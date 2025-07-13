@@ -1,10 +1,17 @@
 #include "shellFunctions.h"
+
+int history_count = 0;
+char *history[HISTORY_SIZE];
+
 char *builtin_str[] = {
     "cd",
-    "help"
-    "exit"
-    "pwd"
-    "history"
+    "help",
+    "exit",
+    "pwd",
+    "history",
+    "grep",
+    "find",
+    "ls"
 };
 
 
@@ -16,7 +23,10 @@ int (*builtin_func[]) (char **) = {
     &dash_help,
     &dash_exit,
     &dash_pwd,
-    &dash_print_history};
+    &dash_print_history,
+    &dash_grep,
+    &dash_find,
+    &dash_ls};
 
 
 int dash_help(char **args){
@@ -29,7 +39,7 @@ int dash_help(char **args){
 
 int dash_cd(char **args){
     if(args[1] == NULL){
-        fprintf(stderr,"cd: needs argument");
+        fprintf(stderr,"cd: needs argument\n");
     }else{
         if(chdir(args[1]) != 0){
             perror("cd");
@@ -54,11 +64,11 @@ int dash_ls(char **args){
     }
 
     while((dir = readdir(d)) != NULL){
-        printf("%s",dir->d_name);
+        printf("%s\n",dir->d_name);
     }
     printf("\n");
     closedir(d);
-    return 0;
+    return 1;
     
 }
 
@@ -67,7 +77,7 @@ int dash_exit(char **args){
 }
 
 
-int dash_pwd(){
+int dash_pwd(char **args){
     char cwd[PATH_MAX];
 
     if(getcwd(cwd,sizeof(cwd)) != NULL){
@@ -75,67 +85,75 @@ int dash_pwd(){
     }else{
         perror("pwd");
     }
+
+    return 1;
 }
 
-void dash_print_history(){
+int dash_print_history(char **args){
     for(int i = 0; i < history_count;i++){
-        printf("%d %s\n",i + 1,history[i]);
+        printf("%d %s\n",i + 1,(char *)history[i]);
     }
+    return 1;
 }
 
-int dash_find(char *pattern,DIR *dir_path){
+int dash_find(char **args){
+
+    if(args[1] == NULL || args[2] == NULL){
+        fprintf(stderr,"Usage: find <pattern> <directory>\n");
+        return 1;
+    }
     DIR *dir;
     struct dirent *entry;
     regex_t regex;
-    char **file_list = NULL;
-    int file_count = 0;
+    
 
-    if (regcomp(&regex, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
+    if (regcomp(&regex, args[1], REG_EXTENDED | REG_NOSUB) != 0) {
         fprintf(stderr, "Compilation error\n");
-        return NULL;
+        return 1;
     }
 
-    dir = opendir(dir_path);
+    dir = opendir(args[2]);
     if (dir == NULL) {
         perror("opendir");
         regfree(&regex);
-        return NULL;
+        return 1;
     }
 
     while ((entry = readdir(dir)) != NULL) {
         if (regexec(&regex, entry->d_name, 0, NULL, 0) == 0) {
-        
-            file_list = realloc(file_list, (file_count + 1) * sizeof(char *));
-            file_list[file_count] = strdup(entry->d_name); 
-            file_count++;
+            printf("%s\n",entry->d_name);
         }
     }
 
     closedir(dir);
     regfree(&regex);
 
-    return file_list;
+    return 1;
 }
 
-int dash_grep(char *pattern,FILE *filename){
+int dash_grep(char **args){
+if(args[1] == NULL || args[2] == NULL){
+    fprintf(stderr,"Usage: grep <pattern> <filename>\n");
+    return 1;
+}
     FILE *file;
     regex_t regex;
-    int buffersize = 256;
-    char *buffer = malloc(buffersize * sizeof(char *));
-    char *read;
+    char buffer[256];
+    
 
-    if (regcomp(&regex, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
+    if (regcomp(&regex, args[1], REG_EXTENDED | REG_NOSUB) != 0) {
         fprintf(stderr, "Compilation error\n");
-        return NULL;
+        return 1;
     }
 
-    file = fopen(filename,"r");
+    file = fopen(args[2],"r");
     if(!file){
         perror("file open error");
-        return;
+        regfree(&regex);
+        return 1;
     }
 
-    while((fgets(buffer,sizeof(buffer),file)) != NULL){
+    while(fgets(buffer,sizeof(buffer),file) != NULL){
         if(regexec(&regex,buffer,0,NULL,0) == 0){
             printf("%s",buffer);
         }
@@ -143,6 +161,7 @@ int dash_grep(char *pattern,FILE *filename){
 
     regfree(&regex);
     fclose(file);
+    return 1;
 }
 
 
