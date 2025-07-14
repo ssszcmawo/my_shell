@@ -17,10 +17,8 @@
 #define TOK_DELIM " \t\r\n"
 #define HISTORY_SIZE 10
 
-
-
 extern char *builtin_str[];
-extern int (*builtin_func[]) (char **);
+extern int (*builtin_func[])(char **);
 extern char *history[HISTORY_SIZE];
 extern int history_count;
 
@@ -32,9 +30,6 @@ int dash_pwd(char **args);
 int dash_print_history(char **args);
 int dash_find(char **args);
 int dash_grep(char **args);
-
-
-
 
 int num_builtins();
 int dash_execute(char **args);
