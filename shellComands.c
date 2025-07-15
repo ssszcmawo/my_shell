@@ -4,14 +4,15 @@ int history_count = 0;
 char *history[HISTORY_SIZE];
 
 char *builtin_str[] = {
-    "cd <dirname>",
+    "cd",
     "help",
     "exit",
     "pwd",
     "history",
-    "grep <pattern> <filename>",
-    "find <pattern> <dirname>",
-    "ls"};
+    "grep",
+    "find",
+    "ls",
+    "rm"};
 
 int num_builtins() { return sizeof(builtin_str) / sizeof(char *); }
 
@@ -23,7 +24,8 @@ int (*builtin_func[])(char **) = {
     &dash_print_history,
     &dash_grep,
     &dash_find,
-    &dash_ls};
+    &dash_ls,
+    &dash_rm};
 
 int dash_help(char **args)
 {
@@ -184,4 +186,64 @@ int dash_grep(char **args)
     regfree(&regex);
     fclose(file);
     return 1;
+}
+
+int dash_rm(char **args)
+{
+    const char *name = args[1];
+    struct stat path_stat;
+    struct dirent *entry;
+
+    if (lstat(name, &path_stat) != 0)
+    {
+        perror("lstat");
+        return -1;
+    }
+
+    if (S_ISREG(path_stat.st_mode) || S_ISLNK(path_stat.st_mode))
+    {
+        if (unlink(name) != 0)
+        {
+            perror("unlink");
+            return -1;
+        }
+    }
+    else if (S_ISDIR(path_stat.st_mode))
+    {
+        DIR *dir = opendir(name);
+        if (!dir)
+        {
+            perror("opendir");
+            return -1;
+        }
+
+        while ((entry = readdir(dir)) != NULL)
+        {
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+                continue;
+            char fullpath[PATH_MAX];
+            int len = snprintf(fullpath, sizeof(fullpath), "%s/%s", name, entry->d_name);
+            if (len < 0 || len > sizeof(fullpath))
+            {
+                fprintf(stderr, "Path too long : %s/%s\n", name, entry->d_name);
+                closedir(dir);
+                return -1;
+            }
+            char *new_args[] = {args[0], fullpath, NULL};
+            if (dash_rm(new_args) != 0)
+            {
+                closedir(dir);
+                return -1;
+            }
+        }
+
+        closedir(dir);
+
+        if (rmdir(name) != 0)
+        {
+            perror("rmdir");
+            return -1;
+        }
+    }
+    return 0;
 }

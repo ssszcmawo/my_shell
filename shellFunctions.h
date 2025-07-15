@@ -30,6 +30,7 @@ int dash_pwd(char **args);
 int dash_print_history(char **args);
 int dash_find(char **args);
 int dash_grep(char **args);
+int dash_rm(char **args);
 
 int num_builtins();
 int dash_execute(char **args);
